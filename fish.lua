@@ -127,19 +127,24 @@ local function castReadyIn()
 end
 
 local rodObjCache = nil
+-- one synchronous pass over the GC (as originally): yielding mid-scan made it miss the rod's
+-- client object. It runs only until the rod is found (then cached), so it's a one-time hitch.
+local function scanForRod(rod)
+    for _, t in ipairs(getgc(true)) do
+        if type(t) == "table" and rawget(t, "Instance") == rod and t.GetCastHitPosition then
+            return t
+        end
+    end
+    return nil
+end
 local function getRodObject(rod)
     if rodObjCache and rawget(rodObjCache, "Instance") == rod then return rodObjCache end
-    rodObjCache = nil
-    local gc = getgc(true)
-    for i = 1, #gc do
-        local t = gc[i]
-        if type(t) == "table" and rawget(t, "Instance") == rod and t.GetCastHitPosition then
-            rodObjCache = t
-            break
-        end
-        if i % 20000 == 0 then task.wait() end -- yield so the game keeps rendering
+    rodObjCache = scanForRod(rod)
+    if not rodObjCache then
+        -- the client object can appear a moment after equipping: try once more
+        task.wait(0.4)
+        rodObjCache = scanForRod(rod)
     end
-    gc = nil
     return rodObjCache
 end
 

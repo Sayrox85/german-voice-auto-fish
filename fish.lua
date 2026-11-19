@@ -13,8 +13,6 @@ while not LP do task.wait(); LP = Players.LocalPlayer end
 if getgenv().AutoFishCleanup then pcall(getgenv().AutoFishCleanup) end
 getgenv().AutoFishRunning = true
 
--- Finds a ModuleScript by name: tries the expected path first, then searches
--- the given roots, retrying until `timeout` seconds have passed.
 local function findModule(name, preferredPath, roots, timeout)
     timeout = timeout or 15
     local t0 = os.clock()

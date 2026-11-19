@@ -24,8 +24,9 @@ local function findModule(name, preferredPath, roots, timeout)
         if node and node:IsA("ModuleScript") then return node end
         for _, root in ipairs(roots) do
             if root then
-                for _, d in ipairs(root:GetDescendants()) do
+                for i, d in ipairs(root:GetDescendants()) do
                     if d.Name == name and d:IsA("ModuleScript") then return d end
+                    if i % 4000 == 0 then task.wait() end -- don't freeze on huge trees
                 end
             end
         end
@@ -129,12 +130,16 @@ local rodObjCache = nil
 local function getRodObject(rod)
     if rodObjCache and rawget(rodObjCache, "Instance") == rod then return rodObjCache end
     rodObjCache = nil
-    for _, t in ipairs(getgc(true)) do
+    local gc = getgc(true)
+    for i = 1, #gc do
+        local t = gc[i]
         if type(t) == "table" and rawget(t, "Instance") == rod and t.GetCastHitPosition then
             rodObjCache = t
             break
         end
+        if i % 20000 == 0 then task.wait() end -- yield so the game keeps rendering
     end
+    gc = nil
     return rodObjCache
 end
 
@@ -219,14 +224,22 @@ local UPV_SIM     = 8
 local UPV_CTRL    = 9
 
 local function findBeginMinigame()
-    for _, f in ipairs(getgc(false)) do
+    -- scanning every function with debug.info in one go froze the game (especially next to
+    -- big hubs that add hundreds of thousands of functions): check the name first (cheap),
+    -- the source only for matches, and yield every few thousand entries
+    local gc = getgc(false)
+    for i = 1, #gc do
+        local f = gc[i]
         if type(f) == "function" then
-            local ok, src = pcall(debug.info, f, "s")
-            if ok and type(src) == "string" and src:find("FishingController", 1, true)
-                and debug.info(f, "n") == "beginMinigame" then
-                return f
+            local okN, n = pcall(debug.info, f, "n")
+            if okN and n == "beginMinigame" then
+                local ok, src = pcall(debug.info, f, "s")
+                if ok and type(src) == "string" and src:find("FishingController", 1, true) then
+                    return f
+                end
             end
         end
+        if i % 5000 == 0 then task.wait() end
     end
 end
 
